@@ -1,0 +1,66 @@
+name: run-registration
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  registration:
+    runs-on: ubuntu-latest
+    steps:
+      - name: register user
+        uses: actions/github-script@v5
+        env:
+          LOGIN: ${{ github.event.comment.user.login }}
+          COMMENT: $${{ github.event.comment.body }}
+          FLAG: ${{ secrets.VULNERABLE_WORKFLOWS_FLAG }}
+        with:
+          github-token: ${{ secrets.PRIVATE_TOKEN }}
+          script: |
+            if (context.issue.number === 1 && process.env.COMMENT.toUpperCase().includes("/DAFTAR")) {
+              console.log('creating user repo');
+              await github.rest.repos.createUsingTemplate({
+                template_owner: 'lame-ctf',
+                template_repo: 'vulnerable-workflows',
+                name: `vulnerable-workflows-${process.env.LOGIN}`,
+                owner: 'lame-ctf',
+                private: true
+              });
+              
+              console.log('adding user as collaborator');
+              await github.rest.repos.addCollaborator({
+                owner: 'lame-ctf',
+                repo: `vulnerable-workflows-${process.env.LOGIN}`,
+                username: process.env.LOGIN,
+                permission: 'pull'
+              });
+            }
+
+  send-flag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: send-flag
+        uses: actions/github-script@v5
+        env:
+          LOGIN: ${{ github.event.comment.user.login }}
+          COMMENT: $${{ github.event.comment.body }}
+          FLAG: ${{ secrets.VULNERABLE_WORKFLOWS_FLAG }}
+        with:
+          github-token: ${{ secrets.PRIVATE_TOKEN }}
+          script: |
+            if (context.issue.number === 1 && process.env.COMMENT.toUpperCase().includes("/SELESAI")) {
+              let readmeFile = await github.rest.repos.getContent({
+                owner: 'lame-ctf',
+                repo: `vulnerable-workflows-${process.env.LOGIN}`,
+                path: 'README.md',
+              });
+
+              if (readmeFile.data.content !== 'IyB2dWxuZXJhYmxlLXdvcmtmbG93cw==\n') {
+                console.log('send the flag');
+                await github.rest.issues.create({
+                  owner: 'lame-ctf',
+                  repo: `vulnerable-workflows-${process.env.LOGIN}`,
+                  title: 'Awsome, here is the flag!',
+                  body: process.env.FLAG
+                });
+              }
+            }
